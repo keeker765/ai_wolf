@@ -1,0 +1,835 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>狼人杀游戏</title>
+    <style>
+        body {
+            font-family: 'Microsoft YaHei', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f5f5f5;
+            color: #333;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .header {
+            background-color: #2c3e50;
+            color: white;
+            padding: 20px 0;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .game-area {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+        .game-panel {
+            flex: 1;
+            min-width: 300px;
+            background-color: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .player-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 15px;
+        }
+        .player-card {
+            width: 120px;
+            background-color: #ecf0f1;
+            border-radius: 8px;
+            padding: 10px;
+            text-align: center;
+            position: relative;
+            transition: all 0.3s ease;
+        }
+        .player-card.dead {
+            opacity: 0.6;
+            background-color: #e74c3c;
+            color: white;
+        }
+        .player-card.selected {
+            border: 2px solid #3498db;
+        }
+        .player-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+        }
+        .player-role {
+            font-weight: bold;
+            margin-top: 5px;
+        }
+        .player-status {
+            font-size: 0.8em;
+            margin-top: 5px;
+        }
+        .action-panel {
+            margin-top: 20px;
+        }
+        .btn {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 10px;
+            margin-bottom: 10px;
+            transition: background-color 0.3s ease;
+        }
+        .btn:hover {
+            background-color: #2980b9;
+        }
+        .btn:disabled {
+            background-color: #95a5a6;
+            cursor: not-allowed;
+        }
+        .btn-danger {
+            background-color: #e74c3c;
+        }
+        .btn-danger:hover {
+            background-color: #c0392b;
+        }
+        .btn-success {
+            background-color: #2ecc71;
+        }
+        .btn-success:hover {
+            background-color: #27ae60;
+        }
+        .game-log {
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: #f9f9f9;
+            border-radius: 4px;
+            padding: 10px;
+            margin-top: 15px;
+            border: 1px solid #ddd;
+        }
+        .log-entry {
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee;
+        }
+        .speech-input {
+            width: 100%;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            margin-top: 10px;
+            resize: vertical;
+        }
+        .phase-indicator {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #3498db;
+            color: white;
+            border-radius: 4px;
+            text-align: center;
+        }
+        .hidden {
+            display: none;
+        }
+        .role-wolf {
+            color: #c0392b;
+        }
+        .role-villager {
+            color: #27ae60;
+        }
+        .role-seer {
+            color: #8e44ad;
+        }
+        .role-guard {
+            color: #2980b9;
+        }
+        #create-game-panel, #join-game-panel {
+            text-align: center;
+            margin-top: 50px;
+        }
+        .input-group {
+            margin-bottom: 15px;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.5);
+        }
+        .modal-content {
+            background-color: white;
+            margin: 15% auto;
+            padding: 20px;
+            border-radius: 8px;
+            width: 50%;
+            max-width: 500px;
+        }
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        .close:hover {
+            color: black;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>狼人杀游戏</h1>
+    </div>
+
+    <div class="container">
+        <!-- 游戏创建面板 -->
+        <div id="create-game-panel">
+            <h2>创建新游戏</h2>
+            <button id="create-game-btn" class="btn btn-success">创建游戏</button>
+            <div class="input-group" style="margin-top: 20px;">
+                <label for="join-game-id">或者加入已有游戏</label>
+                <input type="text" id="join-game-id" placeholder="输入游戏ID">
+                <div style="margin-top: 10px;">
+                    <label for="player-id-select">选择玩家ID (0-5):</label>
+                    <select id="player-id-select">
+                        <option value="0">玩家 0</option>
+                        <option value="1">玩家 1</option>
+                        <option value="2">玩家 2</option>
+                        <option value="3">玩家 3</option>
+                        <option value="4">玩家 4</option>
+                        <option value="5">玩家 5</option>
+                    </select>
+                </div>
+                <button id="join-game-btn" class="btn">加入游戏</button>
+            </div>
+        </div>
+
+        <!-- 游戏主界面 -->
+        <div id="game-interface" class="hidden">
+            <div class="game-info">
+                <h2>游戏ID: <span id="game-id"></span></h2>
+                <div class="phase-indicator" id="phase-indicator">等待游戏开始</div>
+            </div>
+
+            <div class="game-area">
+                <div class="game-panel">
+                    <h3>玩家信息</h3>
+                    <div>
+                        <p>你是: <span id="player-role" class="player-role"></span> (玩家 <span id="player-id"></span>)</p>
+                        <p id="player-special-info" class="hidden"></p>
+                    </div>
+
+                    <h3>所有玩家</h3>
+                    <div class="player-list" id="player-list">
+                        <!-- 玩家卡片将在这里动态生成 -->
+                    </div>
+
+                    <div class="action-panel" id="action-panel">
+                        <h3>行动</h3>
+                        <!-- 不同角色和阶段的行动按钮将在这里动态生成 -->
+                        <div id="night-actions" class="hidden">
+                            <p>选择一名玩家进行操作:</p>
+                            <button id="confirm-night-action" class="btn btn-success">确认</button>
+                        </div>
+
+                        <div id="day-actions" class="hidden">
+                            <textarea id="speech-input" class="speech-input" placeholder="输入你的发言..."></textarea>
+                            <button id="submit-speech" class="btn btn-success">发言</button>
+                        </div>
+
+                        <div id="vote-actions" class="hidden">
+                            <p>选择一名玩家进行投票:</p>
+                            <button id="confirm-vote" class="btn btn-success">确认投票</button>
+                        </div>
+
+                        <div id="admin-actions">
+                            <button id="next-phase-btn" class="btn">进入下一阶段</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="game-panel">
+                    <h3>游戏日志</h3>
+                    <div class="game-log" id="game-log">
+                        <!-- 游戏日志将在这里动态添加 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 结果弹窗 -->
+    <div id="result-modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>游戏结束</h2>
+            <p id="winner-text"></p>
+            <button id="new-game-btn" class="btn btn-success">开始新游戏</button>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let gameId = null;
+        let playerId = null;
+        let playerRole = null;
+        let gameState = null;
+        let selectedPlayerId = null;
+        let ws = null;
+
+        // DOM元素
+        const createGamePanel = document.getElementById('create-game-panel');
+        const gameInterface = document.getElementById('game-interface');
+        const createGameBtn = document.getElementById('create-game-btn');
+        const joinGameBtn = document.getElementById('join-game-btn');
+        const joinGameIdInput = document.getElementById('join-game-id');
+        const playerIdSelect = document.getElementById('player-id-select');
+        const gameIdDisplay = document.getElementById('game-id');
+        const playerIdDisplay = document.getElementById('player-id');
+        const playerRoleDisplay = document.getElementById('player-role');
+        const playerSpecialInfo = document.getElementById('player-special-info');
+        const playerList = document.getElementById('player-list');
+        const phaseIndicator = document.getElementById('phase-indicator');
+        const gameLog = document.getElementById('game-log');
+        const nightActions = document.getElementById('night-actions');
+        const dayActions = document.getElementById('day-actions');
+        const voteActions = document.getElementById('vote-actions');
+        const confirmNightAction = document.getElementById('confirm-night-action');
+        const submitSpeech = document.getElementById('submit-speech');
+        const speechInput = document.getElementById('speech-input');
+        const confirmVote = document.getElementById('confirm-vote');
+        const nextPhaseBtn = document.getElementById('next-phase-btn');
+        const resultModal = document.getElementById('result-modal');
+        const winnerText = document.getElementById('winner-text');
+        const newGameBtn = document.getElementById('new-game-btn');
+        const closeModal = document.querySelector('.close');
+
+        // 事件监听器
+        createGameBtn.addEventListener('click', createGame);
+        joinGameBtn.addEventListener('click', joinGame);
+        confirmNightAction.addEventListener('click', handleNightAction);
+        submitSpeech.addEventListener('click', submitPlayerSpeech);
+        confirmVote.addEventListener('click', submitPlayerVote);
+        nextPhaseBtn.addEventListener('click', advanceGamePhase);
+        newGameBtn.addEventListener('click', resetGame);
+        closeModal.addEventListener('click', () => resultModal.style.display = 'none');
+
+        // 创建新游戏
+        async function createGame() {
+            try {
+                const response = await fetch('/games', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ verbose: false })
+                });
+
+                if (!response.ok) {
+                    throw new Error('创建游戏失败');
+                }
+
+                const data = await response.json();
+                gameId = data.game_id;
+                joinGameIdInput.value = gameId;
+                addLogEntry(`游戏创建成功，ID: ${gameId}`);
+            } catch (error) {
+                console.error('创建游戏错误:', error);
+                addLogEntry(`错误: ${error.message}`, true);
+            }
+        }
+
+        // 加入游戏
+        async function joinGame() {
+            const gameIdToJoin = joinGameIdInput.value.trim();
+            const playerIdToJoin = parseInt(playerIdSelect.value);
+
+            if (!gameIdToJoin) {
+                alert('请输入游戏ID');
+                return;
+            }
+
+            try {
+                // 检查游戏是否存在
+                const response = await fetch(`/games/${gameIdToJoin}`);
+                if (!response.ok) {
+                    throw new Error('游戏不存在');
+                }
+
+                // 设置全局变量
+                gameId = gameIdToJoin;
+                playerId = playerIdToJoin;
+
+                // 获取玩家信息
+                const playerResponse = await fetch(`/games/${gameId}/player/${playerId}`);
+                if (!playerResponse.ok) {
+                    throw new Error('获取玩家信息失败');
+                }
+
+                const playerData = await playerResponse.json();
+                playerRole = playerData.role;
+
+                // 显示游戏界面
+                createGamePanel.classList.add('hidden');
+                gameInterface.classList.remove('hidden');
+
+                // 更新界面信息
+                gameIdDisplay.textContent = gameId;
+                playerIdDisplay.textContent = playerId;
+                playerRoleDisplay.textContent = playerRole;
+                updatePlayerRoleClass();
+
+                // 显示特殊信息（预言家已查验的玩家、守卫上一轮守护的玩家）
+                updateSpecialInfo(playerData);
+
+                // 连接WebSocket
+                connectWebSocket();
+
+                // 获取并显示游戏状态
+                const gameResponse = await fetch(`/games/${gameId}`);
+                if (gameResponse.ok) {
+                    const gameData = await gameResponse.json();
+                    updateGameState(gameData);
+                }
+            } catch (error) {
+                console.error('加入游戏错误:', error);
+                addLogEntry(`错误: ${error.message}`, true);
+            }
+        }
+
+        // 连接WebSocket
+        function connectWebSocket() {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const wsUrl = `${protocol}//${window.location.host}/ws/${gameId}/${playerId}`;
+            ws = new WebSocket(wsUrl);
+
+            ws.onopen = () => {
+                addLogEntry('WebSocket连接已建立');
+            };
+
+            ws.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                handleWebSocketMessage(data);
+            };
+
+            ws.onclose = () => {
+                addLogEntry('WebSocket连接已关闭');
+            };
+
+            ws.onerror = (error) => {
+                console.error('WebSocket错误:', error);
+                addLogEntry('WebSocket连接错误', true);
+            };
+        }
+
+        // 处理WebSocket消息
+        function handleWebSocketMessage(data) {
+            if (data.error) {
+                addLogEntry(`错误: ${data.error}`, true);
+                return;
+            }
+
+            if (data.type === 'init') {
+                // 初始化消息
+                playerRole = data.role;
+                playerRoleDisplay.textContent = playerRole;
+                updatePlayerRoleClass();
+                updateGameState(data.game_state);
+            } else if (data.type === 'phase_change') {
+                // 阶段变更消息
+                updateGameState(data.game_state);
+                addLogEntry(`游戏阶段变更: ${data.previous_phase} -> ${data.current_phase}`);
+
+                // 检查游戏是否结束
+                if (data.game_ended) {
+                    showGameResult(data.winner);
+                }
+            } else if (data.type === 'message') {
+                // 玩家消息
+                addLogEntry(`玩家 ${data.player_id} 说: ${data.message}`);
+            }
+        }
+
+        // 更新游戏状态
+        function updateGameState(state) {
+            gameState = state;
+            updatePhaseIndicator();
+            updatePlayerList();
+            updateActionPanel();
+        }
+
+        // 更新阶段指示器
+        function updatePhaseIndicator() {
+            if (!gameState) return;
+
+            const phase = gameState.current_phase;
+            const round = gameState.current_round;
+
+            let phaseText = '';
+            switch (phase) {
+                case 'NIGHT':
+                    phaseText = `第 ${round + 1} 轮 - 夜晚阶段`;
+                    break;
+                case 'DAY':
+                    phaseText = `第 ${round + 1} 轮 - 白天发言阶段`;
+                    break;
+                case 'VOTING':
+                    phaseText = `第 ${round + 1} 轮 - 投票阶段`;
+                    break;
+                default:
+                    phaseText = '等待游戏开始';
+            }
+
+            phaseIndicator.textContent = phaseText;
+        }
+
+        // 更新玩家列表
+        function updatePlayerList() {
+            if (!gameState || !gameState.players) return;
+
+            playerList.innerHTML = '';
+            gameState.players.forEach(player => {
+                const playerCard = document.createElement('div');
+                playerCard.className = `player-card ${player.alive ? '' : 'dead'}`;
+                playerCard.dataset.playerId = player.player_id;
+
+                // 如果是当前玩家，添加标记
+                if (player.player_id === playerId) {
+                    playerCard.classList.add('selected');
+                }
+
+                const roleDisplay = player.role === 'UNKNOWN' ? '未知' : player.role;
+                const roleClass = getRoleClass(player.role);
+
+                playerCard.innerHTML = `
+                    <div>玩家 ${player.player_id}</div>
+                    <div class="player-role ${roleClass}">${roleDisplay}</div>
+                    <div class="player-status">${player.alive ? '存活' : '死亡'}</div>
+                `;
+
+                // 添加点击事件，用于选择目标玩家
+                if (player.alive && player.player_id !== playerId) {
+                    playerCard.addEventListener('click', () => selectPlayer(player.player_id));
+                }
+
+                playerList.appendChild(playerCard);
+            });
+        }
+
+        // 更新行动面板
+        function updateActionPanel() {
+            if (!gameState) return;
+
+            const phase = gameState.current_phase;
+            nightActions.classList.add('hidden');
+            dayActions.classList.add('hidden');
+            voteActions.classList.add('hidden');
+
+            // 检查玩家是否存活
+            const playerAlive = gameState.players.find(p => p.player_id === playerId)?.alive || false;
+            if (!playerAlive) {
+                addLogEntry('你已经死亡，无法执行操作');
+                return;
+            }
+
+            switch (phase) {
+                case 'NIGHT':
+                    if (playerRole === 'WOLF' || playerRole === 'SEER' || playerRole === 'GUARD') {
+                        nightActions.classList.remove('hidden');
+                    }
+                    break;
+                case 'DAY':
+                    dayActions.classList.remove('hidden');
+                    break;
+                case 'VOTING':
+                    voteActions.classList.remove('hidden');
+                    break;
+            }
+        }
+
+        // 选择玩家
+        function selectPlayer(id) {
+            // 取消之前的选择
+            const previousSelected = document.querySelector('.player-card.target-selected');
+            if (previousSelected) {
+                previousSelected.classList.remove('target-selected');
+            }
+
+            // 设置新的选择
+            selectedPlayerId = id;
+            const playerCard = document.querySelector(`.player-card[data-player-id="${id}"]`);
+            if (playerCard) {
+                playerCard.classList.add('target-selected');
+            }
+
+            addLogEntry(`已选择玩家 ${id}`);
+        }
+
+        // 处理夜间行动
+        async function handleNightAction() {
+            if (!selectedPlayerId) {
+                alert('请选择一名玩家');
+                return;
+            }
+
+            let actionType = '';
+            switch (playerRole) {
+                case 'WOLF':
+                    actionType = 'wolf';
+                    break;
+                case 'SEER':
+                    actionType = 'seer';
+                    break;
+                case 'GUARD':
+                    actionType = 'guard';
+                    break;
+                default:
+                    alert('你的角色无法在夜间行动');
+                    return;
+            }
+
+            try {
+                const response = await fetch(`/games/${gameId}/player/${playerId}/action`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action_type: actionType,
+                        target_id: selectedPlayerId
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || '行动失败');
+                }
+
+                const data = await response.json();
+                addLogEntry(data.message);
+
+                // 重置选择
+                selectedPlayerId = null;
+                const targetSelected = document.querySelector('.player-card.target-selected');
+                if (targetSelected) {
+                    targetSelected.classList.remove('target-selected');
+                }
+
+                // 隐藏行动面板
+                nightActions.classList.add('hidden');
+            } catch (error) {
+                console.error('夜间行动错误:', error);
+                addLogEntry(`错误: ${error.message}`, true);
+            }
+        }
+
+        // 提交玩家发言
+        async function submitPlayerSpeech() {
+            const speech = speechInput.value.trim();
+            if (!speech) {
+                alert('请输入发言内容');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/games/${gameId}/player/${playerId}/action`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action_type: 'speech',
+                        content: speech
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || '发言失败');
+                }
+
+                const data = await response.json();
+                addLogEntry(`你说: ${speech}`);
+                addLogEntry(data.message);
+
+                // 清空输入框
+                speechInput.value = '';
+
+                // 隐藏发言面板
+                dayActions.classList.add('hidden');
+            } catch (error) {
+                console.error('发言错误:', error);
+                addLogEntry(`错误: ${error.message}`, true);
+            }
+        }
+
+        // 提交玩家投票
+        async function submitPlayerVote() {
+            if (!selectedPlayerId && selectedPlayerId !== 0) {
+                alert('请选择一名玩家');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/games/${gameId}/player/${playerId}/action`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        action_type: 'vote',
+                        target_id: selectedPlayerId
+                    })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || '投票失败');
+                }
+
+                const data = await response.json();
+                addLogEntry(data.message);
+
+                // 重置选择
+                selectedPlayerId = null;
+                const targetSelected = document.querySelector('.player-card.target-selected');
+                if (targetSelected) {
+                    targetSelected.classList.remove('target-selected');
+                }
+
+                // 隐藏投票面板
+                voteActions.classList.add('hidden');
+            } catch (error) {
+                console.error('投票错误:', error);
+                addLogEntry(`错误: ${error.message}`, true);
+            }
+        }
+
+        // 进入下一阶段
+        async function advanceGamePhase() {
+            try {
+                const response = await fetch(`/games/${gameId}/next-phase`, {
+                    method: 'POST'
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.detail || '进入下一阶段失败');
+                }
+
+                const data = await response.json();
+                addLogEntry(`游戏阶段变更: ${data.previous_phase} -> ${data.current_phase}`);
+
+                // 检查游戏是否结束
+                if (data.game_ended) {
+                    showGameResult(data.winner);
+                }
+            } catch (error) {
+                console.error('进入下一阶段错误:', error);
+                addLogEntry(`错误: ${error.message}`, true);
+            }
+        }
+
+        // 显示游戏结果
+        function showGameResult(winner) {
+            winnerText.textContent = `胜利方: ${winner}`;
+            resultModal.style.display = 'block';
+        }
+
+        // 重置游戏
+        function resetGame() {
+            gameId = null;
+            playerId = null;
+            playerRole = null;
+            gameState = null;
+            selectedPlayerId = null;
+
+            // 关闭WebSocket连接
+            if (ws) {
+                ws.close();
+                ws = null;
+            }
+
+            // 重置界面
+            resultModal.style.display = 'none';
+            gameInterface.classList.add('hidden');
+            createGamePanel.classList.remove('hidden');
+            gameLog.innerHTML = '';
+            addLogEntry('游戏已重置');
+        }
+
+        // 更新角色样式类
+        function updatePlayerRoleClass() {
+            playerRoleDisplay.className = 'player-role ' + getRoleClass(playerRole);
+        }
+
+        // 获取角色样式类
+        function getRoleClass(role) {
+            switch (role) {
+                case 'WOLF': return 'role-wolf';
+                case 'VILLAGER': return 'role-villager';
+                case 'SEER': return 'role-seer';
+                case 'GUARD': return 'role-guard';
+                default: return '';
+            }
+        }
+
+        // 更新特殊信息
+        function updateSpecialInfo(playerData) {
+            let specialInfo = '';
+
+            if (playerRole === 'SEER' && playerData.checked_players) {
+                const checked = Object.entries(playerData.checked_players);
+                if (checked.length > 0) {
+                    specialInfo += '你已查验的玩家: ' + checked.map(([pid, role]) => `玩家${pid}(${role})`).join(', ');
+                }
+            }
+
+            if (playerRole === 'GUARD' && playerData.last_guarded !== -1) {
+                if (specialInfo) specialInfo += '<br>';
+                specialInfo += `你上一轮守护了玩家 ${playerData.last_guarded}`;
+            }
+
+            if (specialInfo) {
+                playerSpecialInfo.innerHTML = specialInfo;
+                playerSpecialInfo.classList.remove('hidden');
+            } else {
+                playerSpecialInfo.classList.add('hidden');
+            }
+        }
+
+        // 添加日志条目
+        function addLogEntry(message, isError = false) {
+            const entry = document.createElement('div');
+            entry.className = `log-entry ${isError ? 'error' : ''}`;
+            entry.textContent = message;
+            gameLog.appendChild(entry);
+            gameLog.scrollTop = gameLog.scrollHeight; // 自动滚动到底部
+        }
+    </script>
+</body>
+</html>
